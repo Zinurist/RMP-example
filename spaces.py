@@ -6,6 +6,7 @@ import cv2
 from mark_constants import *
 
 
+
 #simple arm with 2 segments, note that theta refers to the angle as percentage of 2*pi (i.e. between 0. and 1.)
 class Arm():
     def __init__(self, theta1, theta2, l1, l2):
@@ -23,12 +24,37 @@ class Arm():
         p3 = p2 + v2*self.l2
         return p1, p2, p3
     
-
-
-class GridSpace():
+class Space():
     def __init__(self, dims):
-        dims = list(dims)
         self.dims = tuple(dims)
+        self.dim = len(dims)
+        
+    def in_bounds(self, p):
+        return (p >=0.0).all() and (p <= 1.0).all()
+    
+    def at(self, point, as_array=False):
+        assert len(point) == self.dim
+        indices = []
+        for i in range(len(self.dims)):
+            indices.append(int(self.dims[i]*point[i]))
+            if indices[i] == self.dims[i]: indices[i] -= 1
+        if as_array: return np.array(indices, dtype=np.int)
+        return tuple(indices)
+    
+    def draw_point(self, p, color):
+        pass
+    
+    def draw_line(self, p1, p2, color):
+        pass
+    
+    def display(self, path=None):
+        pass
+    
+
+class GridSpace(Space):
+    def __init__(self, dims):
+        Space.__init__(self, dims)
+        dims = list(dims)
         self.grid = np.zeros(dims, dtype=np.uint8)
         dims.append(3)
         self.grid_vis = np.zeros(dims, dtype=np.uint8) +255
@@ -42,20 +68,14 @@ class GridSpace():
     def reset_vis(self):
         self.grid_vis = np.copy(self._checkpoint_vis)
         
+    
+    def draw_point(self, p, color):
+        self.mark(p, mark=None, mark_vis=color)
         
-    def in_bounds(self, p):
-        return (p >=0.0).all() and (p <= 1.0).all()
-     
     
-    def at(self, point, as_array=False):
-        assert len(point) == len(self.dims)
-        indices = []
-        for i in range(len(self.dims)):
-            indices.append(int(self.dims[i]*point[i]))
-            if indices[i] == self.dims[i]: indices[i] -= 1
-        if as_array: return np.array(indices, dtype=np.int)
-        return tuple(indices)
-    
+    def draw_line(self, p1, p2, color):
+        self.add_line(p1, p2, mark=None, mark_vis=color)
+        
     
     def mark(self, point, mark=None, mark_vis=None):
         if mark is not None: self.grid[self.at(point)] = mark
@@ -101,12 +121,13 @@ class GridSpace():
         
     def add_line(self, p1, p2, mark=None, mark_vis=None):
         assert len(self.dims) == 2
+        p1,p2 = np.array(p1),np.array(p2)
         #smallest step size: size of a cell dx,dy
         dx,dy = 1.0/self.dims[0],1.0/self.dims[1]
         d = min(dx,dy)
         v = p2-p1
         v_max = np.max(np.abs(v))
-        steps = int(np.ceil(v_max/d))
+        steps = int(np.ceil(v_max/d))+1
         v = v / steps
         for i in range(steps):
             p = p1 + i*v
@@ -177,6 +198,94 @@ class GridSpace():
         display(img)
         if path is not None: img.save(path)
         return img
+
+
+#small helper func for PolygonSpace
+def to_hom(p):
+    p = list(p)
+    p.append(1)
+    return np.array(p)
+    
+class PolygonSpace(Space):
+    def __init__(self, dim):
+        Space.__init__(self, [100]*dim)
+        self.polygons = []
+        self.points_to_draw = []
+        self.lines_to_draw = []
+    
+    def draw_point(self, p, color):
+        self.points_to_draw.append((p, color))
+        
+    def draw_line(self, p1, p2, color):
+        self.lines_to_draw.append((p1,p2,color))
+    
+    def add_polygon(self, points):
+        #calculate line segments in homogenous coords
+        polylines = []
+        for i in range(len(points)-1):
+            p1, p2 = to_hom(points[i]), to_hom(points[i+1])
+            polylines.append(np.cross(p1,p2))
+            
+        self.polygons.append((points, polylines))
+        
+        
+    #NOTE: if you have a circle as a robot and you're trying to check if it collides with an object when going along a line,
+    #then instead you could model the object bigger (extend it by the radius of the robot) and the robot only as a point
+    #the normal check_line here would then work
+        
+    def check_line(self, p1, p2):
+        assert self.dim == 2
+        p1, p2 = to_hom(p1), to_hom(p2)
+        line = np.cross(p1,p2)
+        
+        def to_norm(p): return np.array([p[0]/p[2], p[1]/p[2]])
+        def in_bounds(p, p1, p2): 
+            xMin, xMax = min(p1[0], p2[0])-1e-09, max(p1[0], p2[0])+1e-09
+            yMin, yMax = min(p1[1], p2[1])-1e-09, max(p1[1], p2[1])+1e-09
+            return (p[0]>=xMin and p[0]<=xMax and p[1]>=yMin and p[1]<=yMax)
+        
+        #check for collisions with all polygons
+        for points,polylines in self.polygons:
+            for i in range(len(points)-1):
+                crosspoint = np.cross(line, polylines[i])
+                #collision if crosspoint is within bounding box of the line
+                #if z is 0 -> parallel (close to 0 -> very far away)
+                if abs(crosspoint[2]) < 1e-10:
+                    continue
+                crosspoint = to_norm(crosspoint)
+                if in_bounds(crosspoint, p1, p2) and in_bounds(crosspoint, points[i], points[i+1]):
+                    return False
+        return True
+    
+    
+    def check_circle(self, p, r):
+        p = np.array(p)
+        for points,_ in self.polygons:
+            for polyp in points:
+                if np.linalg.norm(polyp - p) < r: return False
+        return True
+        
+    
+    def display(self, path=None, empty_lists=False):
+        #for now abuse grid space for this...
+        space = GridSpace([250]*self.dim)
+        
+        for points,polylines in self.polygons:
+            for i in range(len(points)-1):
+                space.draw_line(points[i], points[i+1], color=OCCUPIED_VIS)
+        
+        for line in self.lines_to_draw:
+            space.draw_line(line[0], line[1], color=line[2])
+        for point in self.points_to_draw:
+            space.draw_point(point[0], color=point[1])
+        
+        if empty_lists:
+            self.lines_to_draw = []
+            self.points_to_draw = []
+                
+        return space.display(path)
+        
+        
         
         
 class Rect():

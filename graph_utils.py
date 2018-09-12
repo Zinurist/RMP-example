@@ -3,8 +3,9 @@ import heapq
 import random
 import time
 from mark_constants import *
+import spaces
 
-class GraphSearch():
+class PathSearch():
     def __init__(self):
         pass
     
@@ -17,13 +18,13 @@ class GraphSearch():
 def simple_distance(p1, p2, nodes):
     return np.sum(np.abs(p1-p2))
 
-class SingleQuery(GraphSearch):
+class SingleQuery(PathSearch):
     def __init__(self, heuristic_func=simple_distance):
-        GraphSearch.__init__(self)
+        PathSearch.__init__(self)
         self.h = heuristic_func
     
     def search_path(self, space, start, goal, animate=False):
-        assert len(space.dims) == 2
+        assert space.dim == 2
         p1,p2 = np.array(start),np.array(goal)
         
         class Node:
@@ -77,14 +78,51 @@ class SingleQuery(GraphSearch):
                     ix_min, iy_min = max(ix-diff, 0), max(iy-diff, 0)
                     ix_max, iy_max = min(ix+diff, space.dims[0]), min(iy+diff, space.dims[1])
                     visited[ix_min:ix_max,iy_min:iy_max] = True
-                    if animate: space.mark(new_p, mark_vis=GREEN)
+                    if animate: space.draw_point(new_p, color=GREEN)
         
         path = [p2]
-        space.add_line(p_new.p, p2, mark=None, mark_vis=LIGHT_GREEN)
+        space.draw_line(p_new.p, p2, color=LIGHT_GREEN)
         while p_new.parent is not None:
             path.insert(0, p_new.p)
-            space.add_line(p_new.p, p_new.parent.p, mark=None, mark_vis=LIGHT_GREEN)
+            space.draw_line(p_new.p, p_new.parent.p, color=LIGHT_GREEN)
             p_new = p_new.parent
         path.insert(0,p1.p)
         return path
 
+
+class Bug0(PathSearch):
+    def __init__(self):
+        PathSearch.__init__(self)
+        
+    def search_path(self, space, start, goal):
+        pass
+    
+class Bug1(PathSearch):
+    def __init__(self):
+        PathSearch.__init__(self)
+        
+    def search_path(self, space, start, goal):
+        pass
+    
+class Bug2(PathSearch):
+    def __init__(self):
+        PathSearch.__init__(self)
+        
+    def search_path(self, space, start, goal):
+        pass
+    
+    
+
+class VisibilityGraph(PathSearch):
+    def __init__(self):
+        PathSearch.__init__(self)
+        self.graph = None
+    
+    def construct_graph(self, space, start, goal):
+        assert type(space) is spaces.PolygonSpace
+    
+    def search_path(self, space, start, goal):
+        self.construct_graph(space, start, goal)
+        
+        #TODO
+        return []
