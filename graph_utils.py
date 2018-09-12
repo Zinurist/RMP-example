@@ -209,13 +209,26 @@ class Bug2(PathSearch):
         _,k,(points,polylines) = next_point_data
         
         num_points = len(points)-1 #start and end point of polygon are registered twice
-        i = (k+1) % num_points
+        
+        #figure out better direction
+        point_pos = points[(k+1) % num_points]
+        point_neg = points[k]
+        distance_pos = np.sum(np.abs(np.array(goal) - np.array(point_pos)))
+        distance_neg = np.sum(np.abs(np.array(goal) - np.array(point_neg)))
+        if distance_pos < distance_neg:
+            direction,line_dir = +1,0
+            i = (k+1) % num_points
+        else:
+            direction,line_dir = -1,-1
+            i = k
+            k = (k+1) % num_points
+        
         current_point = points[i]
         path = [current_point]
         
         while i != k:
-            line = polylines[i]
-            i = (i+1) % num_points
+            line = polylines[i+line_dir] #module not necessary, only -1 can happen which is fine in python
+            i = (i+direction) % num_points
             next_point = points[i]
             
             crosspoint = calculate_crosspoint(line, goal_line, current_point, next_point, start, goal)
