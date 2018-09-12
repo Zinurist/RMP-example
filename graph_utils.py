@@ -3,6 +3,7 @@ import heapq
 import random
 import time
 from mark_constants import *
+from math_utils import *
 import spaces
 
 class PathSearch():
@@ -81,10 +82,8 @@ class SingleQuery(PathSearch):
                     if animate: space.draw_point(new_p, color=GREEN)
         
         path = [p2]
-        space.draw_line(p_new.p, p2, color=LIGHT_GREEN)
         while p_new.parent is not None:
             path.insert(0, p_new.p)
-            space.draw_line(p_new.p, p_new.parent.p, color=LIGHT_GREEN)
             p_new = p_new.parent
         path.insert(0,p1.p)
         return path
@@ -97,6 +96,7 @@ class Bug0(PathSearch):
     def search_path(self, space, start, goal):
         pass
     
+    
 class Bug1(PathSearch):
     def __init__(self):
         PathSearch.__init__(self)
@@ -104,12 +104,65 @@ class Bug1(PathSearch):
     def search_path(self, space, start, goal):
         pass
     
+    
 class Bug2(PathSearch):
     def __init__(self):
         PathSearch.__init__(self)
         
     def search_path(self, space, start, goal):
-        pass
+        assert type(space) is spaces.PolygonSpace
+        
+        path = [start]
+        goal_line = to_line(to_hom(start),to_hom(goal))
+        current_point = start
+        while True:
+            points_data = space.find_crosspoints(current_point, goal)
+            
+            #look for closest crosspoint = next obstacle
+            min_distance = 2.0
+            for point,i,polygon in points_data:
+                distance = np.sum(np.abs(np.array(current_point) - np.array(point)))
+                if distance < min_distance and distance > 1e-09:
+                    min_distance = distance
+                    next_point_data = (point,i,polygon)
+            
+            if min_distance > 1.5 or len(points_data) == 0:
+                path.append(goal)
+                return path
+            
+            path.append(next_point_data[0])
+            
+            #start going around object until crossing goal line again
+            new_path = self._go_around(next_point_data, goal_line, start, goal)
+            
+            path.extend(new_path)
+            current_point = new_path[-1]
+            
+            
+    def _go_around(self, next_point_data, goal_line, start, goal):
+        _,k,(points,polylines) = next_point_data
+        
+        num_points = len(points)-1 #start and end point of polygon are registered twice
+        i = (k+1) % num_points
+        current_point = points[i]
+        path = [current_point]
+        
+        while i != k:
+            line = polylines[i]
+            i = (i+1) % num_points
+            next_point = points[i]
+            
+            crosspoint = calculate_crosspoint(line, goal_line, current_point, next_point, start, goal)
+            if crosspoint is not None:
+                path.append(tuple(crosspoint))
+                return path
+            
+            path.append(next_point)
+            current_point = next_point
+            
+        raise ValueError('no path found, or maybe invalid polygon')
+            
+        
     
     
 

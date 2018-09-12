@@ -4,7 +4,7 @@ import time
 from IPython.display import display, clear_output
 import cv2
 from mark_constants import *
-
+from math_utils import *
 
 
 #simple arm with 2 segments, note that theta refers to the angle as percentage of 2*pi (i.e. between 0. and 1.)
@@ -49,6 +49,12 @@ class Space():
     
     def display(self, path=None):
         pass
+    
+    def draw_path(self, path, color_path=LIGHT_GREEN, color_start=BLUE, color_goal=LIGHT_BLUE):
+        for i in range(len(path)-1):
+            self.draw_line(path[i], path[i+1], color_path)
+        self.draw_point(path[0], color_start)
+        self.draw_point(path[-1], color_goal)
     
 
 class GridSpace(Space):
@@ -200,11 +206,6 @@ class GridSpace(Space):
         return img
 
 
-#small helper func for PolygonSpace
-def to_hom(p):
-    p = list(p)
-    p.append(1)
-    return np.array(p)
     
 class PolygonSpace(Space):
     def __init__(self, dim):
@@ -224,7 +225,7 @@ class PolygonSpace(Space):
         polylines = []
         for i in range(len(points)-1):
             p1, p2 = to_hom(points[i]), to_hom(points[i+1])
-            polylines.append(np.cross(p1,p2))
+            polylines.append(to_line(p1,p2))
             
         self.polygons.append((points, polylines))
         
@@ -236,26 +237,29 @@ class PolygonSpace(Space):
     def check_line(self, p1, p2):
         assert self.dim == 2
         p1, p2 = to_hom(p1), to_hom(p2)
-        line = np.cross(p1,p2)
-        
-        def to_norm(p): return np.array([p[0]/p[2], p[1]/p[2]])
-        def in_bounds(p, p1, p2): 
-            xMin, xMax = min(p1[0], p2[0])-1e-09, max(p1[0], p2[0])+1e-09
-            yMin, yMax = min(p1[1], p2[1])-1e-09, max(p1[1], p2[1])+1e-09
-            return (p[0]>=xMin and p[0]<=xMax and p[1]>=yMin and p[1]<=yMax)
+        line = to_line(p1,p2)
         
         #check for collisions with all polygons
         for points,polylines in self.polygons:
             for i in range(len(points)-1):
-                crosspoint = np.cross(line, polylines[i])
-                #collision if crosspoint is within bounding box of the line
-                #if z is 0 -> parallel (close to 0 -> very far away)
-                if abs(crosspoint[2]) < 1e-10:
-                    continue
-                crosspoint = to_norm(crosspoint)
-                if in_bounds(crosspoint, p1, p2) and in_bounds(crosspoint, points[i], points[i+1]):
+                crosspoint = calculate_crosspoint(line, polylines[i], p1, p2, points[i], points[i+1])
+                if crosspoint is not None:
                     return False
         return True
+    
+    
+    def find_crosspoints(self, p1, p2):
+        assert self.dim == 2
+        p1, p2 = to_hom(p1), to_hom(p2)
+        line = to_line(p1,p2)
+        
+        crosspoints = []
+        for points,polylines in self.polygons:
+            for i in range(len(points)-1):
+                crosspoint = calculate_crosspoint(line, polylines[i], p1, p2, points[i], points[i+1])
+                if crosspoint is not None:
+                    crosspoints.append((crosspoint, i, (points,polylines)))
+        return crosspoints
     
     
     def check_circle(self, p, r):
