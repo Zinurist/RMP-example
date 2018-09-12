@@ -206,7 +206,7 @@ class GridSpace(Space):
         return img
 
 
-    
+#note: implementation assumes the edges of the polygon are free space    
 class PolygonSpace(Space):
     def __init__(self, dim):
         Space.__init__(self, [100]*dim)

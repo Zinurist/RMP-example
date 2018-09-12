@@ -94,7 +94,73 @@ class Bug0(PathSearch):
         PathSearch.__init__(self)
         
     def search_path(self, space, start, goal):
-        pass
+        assert type(space) is spaces.PolygonSpace
+        
+        path = [start]
+        goal_line = to_line(to_hom(start),to_hom(goal))
+        current_point = start
+        while True:
+            points_data = space.find_crosspoints(current_point, goal)
+            
+            #look for closest crosspoint = next obstacle
+            min_distance = 2.0
+            for point,i,polygon in points_data:
+                distance = np.sum(np.abs(np.array(current_point) - np.array(point)))
+                if distance < min_distance and distance > 1e-09:
+                    min_distance = distance
+                    next_point_data = (point,i,polygon)
+            
+            if min_distance > 1.5 or len(points_data) == 0:
+                path.append(goal)
+                return path
+            
+            path.append(next_point_data[0])
+            
+            #start going around object until crossing goal line again
+            new_path = self._go_around(next_point_data, start, goal)
+            
+            path.extend(new_path)
+            current_point = new_path[-1]
+            
+            
+    def _go_around(self, next_point_data, start, goal):
+        _,k,(points,polylines) = next_point_data
+        
+        num_points = len(points)-1 #start and end point of polygon are registered twice
+        
+        #figure out better direction
+        point_pos = points[(k+1) % num_points]
+        point_neg = points[k]
+        distance_pos = np.sum(np.abs(np.array(goal) - np.array(point_pos)))
+        distance_neg = np.sum(np.abs(np.array(goal) - np.array(point_neg)))
+        if distance_pos < distance_neg:
+            direction = +1
+            i = (k+1) % num_points
+        else:
+            direction = -1
+            i = k
+            k = (k+1) % num_points
+        
+        current_point = points[i]
+        path = [current_point]
+        
+        while i != k:
+            goal_line = to_line(to_hom(current_point), to_hom(goal))
+            i = (i+direction) % num_points
+            next_point = points[i]
+            next_point2 = points[(i+direction) % num_points]
+            
+            #check if polyline and goalline are pointed in such a way that the robot can move towards goal without hitting the polyline
+            #this would require normal vector of the side of the obstacle where we're at
+            #idea: check if the next two lines are on the same side w.r.t. the goal line
+            #treat goal line as hyperplane w, like in classification: sgn(w^Tc) determines which side c is on
+            if np.sign(np.inner(goal_line, to_hom(next_point))) == np.sign(np.inner(goal_line, to_hom(next_point2))):
+                return path
+            
+            path.append(next_point)
+            current_point = next_point
+            
+        raise ValueError('no path found, or maybe invalid polygon')
     
     
 class Bug1(PathSearch):
