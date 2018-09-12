@@ -1,6 +1,6 @@
 # Robot motion planning example with simple arm
 
-Task: Move arm from black position (start) to grey position (goal) without touching the rectangles. 
+Task: Move arm from blue position (start) to light blue position (goal) without touching the rectangles. 
 The arm's movement is described by two angles, one at the base of the robot, and one at joint of the two arms.
 
 
