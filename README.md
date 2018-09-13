@@ -28,4 +28,4 @@ The path tells us how to change the angles of the arm over time to reach the goa
 | Visibility graph | | Voronoi |
 | ---------------- | --- | ------- |
 | ![poly_vis2.png](example/poly_vis2.png) | ![poly_vis1.png](example/poly_vis1.png) | ![poly_vor2.png](example/poly_vor2.png) |
-| Build a graph by connecting all vertices that see each other (edges of polygons count as well) |  | Use a voronoi diagram and move along the space that is fruthest aways from obstacles (here: white) | 
+| Build a graph by connecting all vertices that see each other (edges of polygons count as well) |  | Use a voronoi diagram and move along the space that is furthest away from obstacles| 
