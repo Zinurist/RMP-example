@@ -32,14 +32,19 @@ class Space():
     def in_bounds(self, p):
         return (p >=0.0).all() and (p <= 1.0).all()
     
+    def in_bounds_index(self, index):
+        for k,i in enumerate(index): 
+            if i<0 or i>=self.dims[k]: return False #TODO prettier with numpy ops?
+        return True
+    
     def at(self, point, as_array=False):
         assert len(point) == self.dim
-        indices = []
+        index = []
         for i in range(len(self.dims)):
-            indices.append(int(self.dims[i]*point[i]))
-            if indices[i] == self.dims[i]: indices[i] -= 1
-        if as_array: return np.array(indices, dtype=np.int)
-        return tuple(indices)
+            index.append(int(self.dims[i]*point[i]))
+            if index[i] == self.dims[i]: index[i] -= 1
+        if as_array: return np.array(index, dtype=np.int)
+        return tuple(index)
     
     def draw_point(self, p, color):
         pass
@@ -75,6 +80,11 @@ class GridSpace(Space):
         self.grid_vis = np.copy(self._checkpoint_vis)
         
     
+    #copy the current grid as grey image to grid_vis, used by voronoi diagram
+    def grid_to_vis(self):
+        self.grid_vis = np.stack((self.grid,)*3, -1)
+        
+    
     def draw_point(self, p, color):
         self.mark(p, mark=None, mark_vis=color)
         
@@ -88,14 +98,19 @@ class GridSpace(Space):
         if mark_vis is not None: self.grid_vis[self.at(point)] = mark_vis
     
     
-    def mark_indices(self, indices, mark=None, mark_vis=None):
-        if mark is not None: self.grid[tuple(indices)] = mark
-        if mark_vis is not None: self.grid_vis[tuple(indices)] = mark_vis
+    def mark_index(self, index, mark=None, mark_vis=None):
+        if mark is not None: self.grid[tuple(index)] = mark
+        if mark_vis is not None: self.grid_vis[tuple(index)] = mark_vis
     
     
     def occupied(self, point=None):
-        if not self.in_bounds(point): return False
+        if not self.in_bounds(point): return True
         return self.grid[self.at(point)] == OCCUPIED
+    
+    
+    def occupied_index(self, index):
+        if not self.in_bounds_index(index): return True
+        return self.grid[tuple(index)] == OCCUPIED
     
     
     def check_arm(self, arm):
@@ -292,6 +307,15 @@ class PolygonSpace(Space):
             self.points_to_draw = []
                 
         return space.display(path)
+    
+    
+    def to_grid_space(self, dims):
+        assert len(dims) == self.dim
+        space = GridSpace(dims)
+        for points,_ in self.polygons:
+            for i in range(len(points)-1):
+                space.add_line(points[i], points[i+1], mark=OCCUPIED, mark_vis=OCCUPIED_VIS)
+        return space
         
         
         
@@ -309,5 +333,5 @@ def create_arm_c_space(space, arm, dims=[500,500]):
             arm.set_thetas((float(t1)/dims[0], float(t2)/dims[1]))
             free = space.check_arm(arm)
             if not free: 
-                c_space.mark_indices((t1,t2), mark=OCCUPIED, mark_vis=OCCUPIED_VIS)
+                c_space.mark_index((t1,t2), mark=OCCUPIED, mark_vis=OCCUPIED_VIS)
     return c_space

@@ -294,3 +294,66 @@ class VisibilityGraph(PathSearch):
         
         return space_vis.display(path)
         
+
+        
+        
+class VoronoiDiagram(PathSearch):
+    def __init__(self):
+        PathSearch.__init__(self)
+        self.voronoi = None
+        
+    def create_voronoi_diagram(self, space):
+        assert type(space) is spaces.GridSpace #NOTE: only marked line below needs to be made compatible with other spaces
+        MAX_VAL = 9999999
+        self.voronoi = np.zeros(space.dims, np.int) +MAX_VAL
+        
+        directions = []
+        for i in range(space.dim):
+            dir_a, dir_b = np.array([0]*space.dim, dtype=np.int), np.array([0]*space.dim, dtype=np.int)
+            dir_a[i] = 1
+            dir_b[i] = -1
+            directions.append(dir_a)
+            directions.append(dir_b)
+        
+        zero = np.array([0]*space.dim, dtype=np.int)
+        self.voronoi[tuple(zero)] = 0
+        
+        #algorithm is similar to dijkstra
+        frontier = [(zero, zero)]
+        while frontier:
+            index, from_dir = frontier.pop()
+            
+            next_val = self.voronoi[tuple(index)] + 1
+                
+            for d in directions:
+                if np.array_equal(d, from_dir): continue
+                next_index = index + d
+                
+                #NOTE: space.occupied needs to be made compatible with spaces other than grid space
+                if space.occupied_index(next_index):
+                    if next_val == 1: continue #i.e. current value is 0 (which it should be for pixel at the border)
+                    #if not: correct current value and repeat for this pixel
+                    self.voronoi[tuple(index)] = 0
+                    frontier.append((index, from_dir))
+                    break
+                
+                if self.voronoi[tuple(next_index)] > next_val: #-> shorter path to pixel found
+                    self.voronoi[tuple(next_index)] = next_val
+                    frontier.append((next_index, -1*d)) #from_dir is opposite direction that we just went
+            
+        self.voronoi[self.voronoi == MAX_VAL] = 0 #unreachable_pixels -> 0
+    
+    def search_path(self, space, start, goal):
+        self.create_voronoi_diagram(space)
+        #TODO search path
+        return [start, goal]
+    
+    def display(self, path=None):
+        if self.voronoi is None: return
+        
+        space_vis = spaces.GridSpace(self.voronoi.shape)
+        voronoi = self.voronoi/np.max(self.voronoi) #convert int voronoi to uint8, normalize data for this -> creates prettier images
+        space_vis.grid = (voronoi*255).astype(np.uint8)
+        space_vis.grid_to_vis()
+        
+        return space_vis.display(path)
