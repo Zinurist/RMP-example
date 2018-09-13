@@ -236,15 +236,19 @@ class PolygonSpace(Space):
         
     def check_line(self, p1, p2):
         assert self.dim == 2
-        p1, p2 = to_hom(p1), to_hom(p2)
-        line = to_line(p1,p2)
+        line = to_line(to_hom(p1), to_hom(p2))
         
         #check for collisions with all polygons
         for points,polylines in self.polygons:
             for i in range(len(points)-1):
                 crosspoint = calculate_crosspoint(line, polylines[i], p1, p2, points[i], points[i+1])
-                if crosspoint is not None:
-                    return False
+                if crosspoint is None: continue
+                
+                #get distance to closest point to check if crosspoint actually is one of those points (happens when you're exactly at one of the polygons)
+                min_distance = 1 #only interested if mindistance < 1e-09, so this is fine
+                for p in [p1, p2, points[i], points[i+1]]: min_distance = min(min_distance, simple_distance(p, crosspoint))
+                if min_distance > 1e-09: return False
+                
         return True
     
     

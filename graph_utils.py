@@ -5,22 +5,22 @@ import time
 from mark_constants import *
 from math_utils import *
 import spaces
+import networkx as nx
 
 class PathSearch():
     def __init__(self):
         pass
     
-    
     def search_path(self, space, start, goal):
         raise NotImplemented()
 
-    
 
-def simple_distance(p1, p2, nodes):
-    return np.sum(np.abs(p1-p2))
+#the nodes argument is needed by SingleQuery (SingleQuery might use other heuristics that need all nodes)
+def simple_distance_heuristic(p1, p2, nodes=None): 
+    return simple_distance(p1, p2)
 
 class SingleQuery(PathSearch):
-    def __init__(self, heuristic_func=simple_distance):
+    def __init__(self, heuristic_func=simple_distance_heuristic):
         PathSearch.__init__(self)
         self.h = heuristic_func
     
@@ -187,7 +187,7 @@ class Bug2(PathSearch):
             #look for closest crosspoint = next obstacle
             min_distance = 2.0
             for point,i,polygon in points_data:
-                distance = np.sum(np.abs(np.array(current_point) - np.array(point)))
+                distance = simple_distance(current_point, point)
                 if distance < min_distance and distance > 1e-09:
                     min_distance = distance
                     next_point_data = (point,i,polygon)
@@ -213,8 +213,8 @@ class Bug2(PathSearch):
         #figure out better direction
         point_pos = points[(k+1) % num_points]
         point_neg = points[k]
-        distance_pos = np.sum(np.abs(np.array(goal) - np.array(point_pos)))
-        distance_neg = np.sum(np.abs(np.array(goal) - np.array(point_neg)))
+        distance_pos = simple_distance(goal, point_pos)
+        distance_neg = simple_distance(goal, point_neg)
         if distance_pos < distance_neg:
             direction,line_dir = +1,0
             i = (k+1) % num_points
@@ -252,9 +252,45 @@ class VisibilityGraph(PathSearch):
     
     def construct_graph(self, space, start, goal):
         assert type(space) is spaces.PolygonSpace
+        self.graph = nx.Graph()
+        g = self.graph
+        g.add_node(start)
+        g.add_node(goal)
+        if space.check_line(goal, start):
+            g.add_edge(start, goal, weight=simple_distance(start, goal))
+        
+        #add all polygons
+        for points,_ in space.polygons:
+            for i in range(len(points)-1):
+                #nodes are added automatically
+                g.add_edge(points[i], points[i+1], weight=simple_distance(points[i],points[i+1]))
+                
+                #check connectivity to other visible nodes (only current nodes in the graph need to be considered)
+                for node in g.nodes():
+                    if space.check_line(node, points[i]):
+                        g.add_edge(node, points[i], weight=simple_distance(node,points[i]))
+        
+        return g #return might be useful
+        
     
     def search_path(self, space, start, goal):
         self.construct_graph(space, start, goal)
+        path = nx.astar_path(self.graph, start, goal, heuristic=simple_distance, weight='weight')
+        return path
+    
+    def display(self, space, path=None):
+        if self.graph is None: return
+        assert type(space) is spaces.PolygonSpace
         
-        #TODO
-        return []
+        #for now abuse grid space for this, like polyspace
+        space_vis = spaces.GridSpace([250]*space.dim)
+        
+        for line in self.graph.edges():
+            space_vis.draw_line(line[0], line[1], color=BLUE)
+        
+        for points,_ in space.polygons:
+            for i in range(len(points)-1):
+                space_vis.draw_line(points[i], points[i+1], color=OCCUPIED_VIS)
+        
+        return space_vis.display(path)
+        

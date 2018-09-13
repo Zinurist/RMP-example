@@ -1,5 +1,8 @@
 import numpy as np
 
+def simple_distance(p1, p2): 
+    return np.sum(np.abs(np.array(p1)-np.array(p2)))
+
 def calculate_crosspoint(l1, l2, p1_l1, p2_l1, p1_l2, p2_l2):
     crosspoint = np.cross(l1, l2)
     if abs(crosspoint[2]) < 1e-10:
