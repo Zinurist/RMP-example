@@ -18,9 +18,14 @@ The path tells us how to change the angles of the arm over time to reach the goa
 
 ## Path finding algorithms
 
-Single Query (used above for the simple arm) creates a graph by randomly expanding nodes until a path to the goal is collision free.
-The Bug algorithms go around colliding obstacles. In Bug 0 the obstacle is left as soon as possible, in Bug 2 the obstacle is left when crossing the (bee) line from the start to goal.
 
 | Single Query (variant) | Bug 0 | Bug 2 |
 | ---------------------- | ----- | ----- |
 | ![poly_sq.png](example/poly_sq.png) | ![poly_bug0.png](example/poly_bug0.png) | ![poly_bug2.png](example/poly_bug2.png) |
+| Explore space and build a graph by randomly expanding nodes | Go around obstacles and leave as soon as possible | Go around obstacles and leave when crossing the line from start to goal again | 
+
+
+| Visibility graph | | Voronoi |
+| ---------------- | --- | ------- |
+| ![poly_vis2.png](example/poly_vis2.png) | ![poly_vis1.png](example/poly_vis1.png) | ![poly_vor2.png](example/poly_vor2.png) |
+| Build a graph by connecting all vertices that see each other (edges of polygons count as well) |  | Use a voronoi diagram and move along the space that is fruthest aways from obstacles (here: white) | 
