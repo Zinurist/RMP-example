@@ -94,7 +94,7 @@ class Bug0(PathSearch):
         PathSearch.__init__(self)
         
     def search_path(self, space, start, goal):
-        assert type(space) is spaces.PolygonSpace
+        if type(space) is not spaces.PolygonSpace: raise TypeError('Currently only supports PolygonSpace')
         
         path = [start]
         goal_line = to_line(to_hom(start),to_hom(goal))
@@ -176,7 +176,7 @@ class Bug2(PathSearch):
         PathSearch.__init__(self)
         
     def search_path(self, space, start, goal):
-        assert type(space) is spaces.PolygonSpace
+        if type(space) is not spaces.PolygonSpace: raise TypeError('Currently only supports PolygonSpace')
         
         path = [start]
         goal_line = to_line(to_hom(start),to_hom(goal))
@@ -251,7 +251,8 @@ class VisibilityGraph(PathSearch):
         self.graph = None
     
     def construct_graph(self, space, start, goal):
-        assert type(space) is spaces.PolygonSpace
+        if type(space) is not spaces.PolygonSpace: raise TypeError('Currently only supports PolygonSpace')
+            
         self.graph = nx.Graph()
         g = self.graph
         g.add_node(start)
@@ -303,7 +304,9 @@ class VoronoiDiagram(PathSearch):
         self.voronoi = None
         
     def create_voronoi_diagram(self, space):
-        assert type(space) is spaces.GridSpace #NOTE: only marked line below needs to be made compatible with other spaces
+        #NOTE: only marked line below needs to be made compatible with other spaces
+        if type(space) is not spaces.GridSpace: raise TypeError('Currently only supports GridSpace')
+            
         MAX_VAL = 9999999
         self.voronoi = np.zeros(space.dims, np.int) +MAX_VAL
         
@@ -357,3 +360,153 @@ class VoronoiDiagram(PathSearch):
         space_vis.grid_to_vis()
         
         return space_vis.display(path)
+    
+    
+    
+class PotentialField(PathSearch):
+    def __init__(self, k_att=0.1, k_rep=0.01, rho_zero=0.01, step_size=1e-4):
+        PathSearch.__init__(self)
+        self.step_size = step_size
+        self.k_att, self.k_rep, self.rho_zero = k_att, k_rep, rho_zero
+        
+    def calculate_rhos(self, space, x):
+        rhos = []
+        vecs = []
+        
+        if type(space) is spaces.GridSpace:
+            assert False #TODO
+        if type(space) is spaces.PolygonSpace:
+            for points,polylines in space.polygons:
+                #find closest point
+                min_d = 2.
+                for i in range(len(points)-1):
+                    d = np.linalg.norm(x - np.array(points[i]))
+                    if d < min_d:
+                        min_d = d
+                        index = i
+                        
+                        
+                p, p1, p2 = np.array(points[index]), np.array(points[index+1]), np.array(points[(index-1) % (len(points)-1)])
+                
+                #project onto lines, use closest point
+                crosspoint1, crosspoint2 = project(x, p, p1, inf_if_none=True), project(x, p, p2, inf_if_none=True)
+                d1, d2 = np.linalg.norm(x-crosspoint1), np.linalg.norm(x-crosspoint2)
+                if min_d < d1 and min_d < d2:
+                    rho = min_d
+                    vec = p - x
+                elif d1 < d2:
+                    rho = d1
+                    vec = crosspoint1 - x
+                else:
+                    rho = d2
+                    vec = crosspoint2 - x
+                
+                if rho > self.rho_zero: continue
+                rhos.append(rho)
+                vecs.append(vec)
+                
+        else:
+            raise TypeError('Type not supported for potential field')
+        
+        return np.expand_dims(np.array(rhos), 1), np.array(vecs)
+        
+        
+    #potential functions here are defined for completeness, but are not needed (only their derivative)
+    def goal_hill(self, x, goal):
+        return -self.k_att * 0.5 * np.square(x-goal)
+    def obstacles(self, x, space):
+        rhos, vecs = self.calculate_rhos(space, x)
+        if rhos.size == 0: return 0
+        return self.k_rep * 0.5 * (np.sum(vecs*rhos, axis=0) - 1/self.rho_zero * np.sum(vecs, axis=0)) 
+        
+    def goal_hill_d(self, x, goal):
+        return -self.k_att * (x-goal)
+    def obstacles_d(self, x, space):
+        rhos, vecs = self.calculate_rhos(space, x)
+        if rhos.size == 0: return 0
+        vecs = vecs / np.square(rhos)
+        return self.k_rep * (1/self.rho_zero * np.sum(vecs, axis=0) - np.sum(vecs/rhos, axis=0))
+            
+    def potential(self, x, goal, space):
+        p1 = self.goal_hill(x, goal)
+        p2 = self.obstacles(x, space)
+        for p in [p1,p2]:
+            if np.linalg.norm(p) > 1.0:
+                p /= np.linalg.norm(p)
+        return  p1+p2
+    def potential_d(self, x, goal, space):
+        p1 = self.goal_hill_d(x, goal)
+        p2 = self.obstacles_d(x, space)
+        for p in [p1,p2]:
+            if np.linalg.norm(p) > 1.0:
+                p /= np.linalg.norm(p)
+        return  p1+p2
+    
+    def search_path(self, space, start, goal):
+        current_point = np.array(start)
+        goal_point = np.array(goal)
+        
+        
+        #gradient ascent
+        path = [start]
+        while True:
+            gradient = self.potential_d(current_point, goal_point, space)
+            step_size = self.step_size
+            
+            while True:
+                next_point = current_point + step_size * gradient
+                if space.in_bounds(next_point) and space.check_line(current_point, next_point): break
+                step_size *= 0.5
+                if step_size < 1e-8: 
+                    print('gradient descent hits wall too often')
+                    return path
+            
+            if np.linalg.norm(current_point - next_point) < 1e-9:
+                print('Not moving anymore')
+                return path
+            
+            path.append(next_point)
+            current_point = next_point
+            
+            #first conditions may be removed
+            if np.linalg.norm(next_point - goal_point) < 0.15 and space.check_line(next_point, goal):
+                path.append(goal)
+                return path
+            
+    def display_vector(self, space, goal, dims=[10,10], path=None):
+        import matplotlib.pyplot as plt
+        assert space.dim == 2
+        
+        X = np.linspace(0., 1., dims[0])
+        Y = np.linspace(0., 1., dims[1])
+        U = np.zeros(dims)
+        V = np.zeros(dims)
+        for i in range(dims[0]):
+            for j in range(dims[1]):
+                vec = self.goal_hill_d(np.array([X[i],Y[j]]), np.array(goal))
+                #vec = self.potential_d(np.array([X[i],Y[j]]), np.array(goal), space)
+                U[j,i] = vec[0]
+                V[j,i] = -vec[1]
+                
+        plt.gca().invert_yaxis()
+        #swap y and x, since images assign y to first coordinate (some above when assigning values to U/V)
+        plt.quiver(Y,X,U,V)
+        if path is not None: plt.savefig(path)
+        plt.show()
+        
+    def display_magnitude(self, space, goal, dims=[10,10], path=None):
+        import matplotlib.pyplot as plt
+        assert space.dim == 2
+        
+        X = np.linspace(0., 1., dims[0])
+        Y = np.linspace(0., 1., dims[1])
+        U = np.zeros(dims)
+        for i in range(dims[0]):
+            for j in range(dims[1]):
+                vec = self.potential_d(np.array([X[i],Y[j]]), np.array(goal), space)
+                U[j,i] = np.linalg.norm(vec)
+        
+        plt.imshow(U, cmap='hot')
+        if path is not None: plt.savefig(path)
+        plt.show()
+        

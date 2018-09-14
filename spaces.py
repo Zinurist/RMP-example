@@ -119,8 +119,9 @@ class GridSpace(Space):
     
     
     def check_line(self, p1, p2):
-        assert len(self.dims) == 2
+        assert self.dim == 2
         if not(self.in_bounds(p1) and self.in_bounds(p2)): return False
+        p1, p2 = np.array(p1), np.array(p2)
         
         #smallest step size: size of a cell dx,dy
         dx,dy = 1.0/self.dims[0],1.0/self.dims[1]
@@ -141,7 +142,7 @@ class GridSpace(Space):
         
         
     def add_line(self, p1, p2, mark=None, mark_vis=None):
-        assert len(self.dims) == 2
+        assert self.dim == 2
         p1,p2 = np.array(p1),np.array(p2)
         #smallest step size: size of a cell dx,dy
         dx,dy = 1.0/self.dims[0],1.0/self.dims[1]
@@ -157,7 +158,7 @@ class GridSpace(Space):
     
     
     def add_rect(self, rect, mark=OCCUPIED, mark_vis=OCCUPIED_VIS):
-        assert len(self.dims) == 2
+        assert self.dim == 2
         start = self.at([rect.x, rect.y])
         end = self.at([rect.x+rect.width, rect.y+rect.height])
         self.grid[start[0]:end[0], start[1]:end[1]] = mark
@@ -326,7 +327,7 @@ class Rect():
         
 #create c-space given the space and arm, dims refers to size of the c-space
 def create_arm_c_space(space, arm, dims=[500,500]):
-    assert len(dims) == 2 and len(space.dims) == 2
+    assert len(dims) == 2 and space.dim == 2
     c_space = GridSpace(dims)
     for t1 in range(dims[0]):
         for t2 in range(dims[1]):
