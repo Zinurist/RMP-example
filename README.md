@@ -28,4 +28,9 @@ The path tells us how to change the angles of the arm over time to reach the goa
 | Visibility graph | | Voronoi |
 | ---------------- | --- | ------- |
 | ![poly_vis2.png](example/poly_vis2.png) | ![poly_vis1.png](example/poly_vis1.png) | ![poly_vor2.png](example/poly_vor2.png) |
-| Build a graph by connecting all vertices that see each other (edges of polygons count as well) |  | Use a voronoi diagram and move along the space that is furthest away from obstacles| 
+| Build a graph by connecting all vertices that see each other (edges of polygons count as well) |  | Use a voronoi diagram and move along the space that is furthest away from obstacles | 
+
+| Potential function | |  |
+| ---------------- | --- | --- |
+| ![potfield2.png](example/potfield2.png) | ![poly_pot.png](example/poly_pot.png) |  |
+| Create potential functions: One that pushes towards the goal, and one that pushes away from obstacles | The potential functions as heatmap | | 
