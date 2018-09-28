@@ -94,11 +94,13 @@ class GridSpace(Space):
         
     
     def mark(self, point, mark=None, mark_vis=None):
+        if not self.in_bounds(np.array(point)): return
         if mark is not None: self.grid[self.at(point)] = mark
         if mark_vis is not None: self.grid_vis[self.at(point)] = mark_vis
     
     
     def mark_index(self, index, mark=None, mark_vis=None):
+        if not self.in_bounds_index(index): return
         if mark is not None: self.grid[tuple(index)] = mark
         if mark_vis is not None: self.grid_vis[tuple(index)] = mark_vis
     
