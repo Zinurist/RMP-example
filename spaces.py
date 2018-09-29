@@ -214,10 +214,10 @@ class GridSpace(Space):
             writer.release()
             
         
-    def display(self, path=None):
+    def display(self, path=None, size=(500,500)):
         img = np.swapaxes(self.grid_vis, 1, 0)
         img = Image.fromarray(img, 'RGB')
-        img = img.resize((500,500))
+        img = img.resize(size)
         clear_output(wait=True)
         display(img)
         if path is not None: img.save(path)
