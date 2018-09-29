@@ -34,3 +34,7 @@ The path tells us how to change the angles of the arm over time to reach the goa
 | ---------------- | --- | --- |
 | ![potfield2.png](example/potfield2.png) | ![poly_pot.png](example/poly_pot.png) |  |
 | Create potential functions: One that pushes towards the goal, and one that pushes away from obstacles. Find a both via methods like gradient descent |  | | 
+
+## Particle Filter
+
+![path.gif](example/pfilter.gif)
